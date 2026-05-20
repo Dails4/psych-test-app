@@ -78,8 +78,9 @@ export default function Home() {
     setIsSharing(true);
 
     try {
-      await delay(300); // Даем браузеру отрисовать градиенты
+      await delay(300); // Микро-задержка для отрисовки шрифтов и градиента
 
+      // Генерируем картинку (теперь карточка полностью непрозрачная, но находится за экраном)
       const dataUrl = await toPng(shareCardRef.current, {
         cacheBust: true,
         pixelRatio: 2,
@@ -215,10 +216,10 @@ export default function Home() {
         {screen === 'result' && resultData && (
           <motion.div key="result" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="z-10 flex flex-col w-full max-w-md h-full flex-1 pt-4 pb-36">
             
-            {/* СКРЫТАЯ КАРТОЧКА ДЛЯ ШЕРИНГА (прозрачная, не мешает кликам, но рендерится) */}
+            {/* СКРЫТАЯ КАРТОЧКА ДЛЯ ШЕРИНГА (убрали opacity-0, вынесли далеко влево за экран) */}
             <div 
               ref={shareCardRef} 
-              className="fixed bottom-0 left-0 w-[500px] h-[500px] p-8 flex flex-col justify-between text-white opacity-0 pointer-events-none z-[-1]"
+              className="fixed top-0 left-[9999px] w-[500px] h-[500px] p-8 flex flex-col justify-between text-white pointer-events-none"
               style={{
                 background: 'linear-gradient(135deg, rgba(124, 92, 252, 0.3) 0%, #0a0a0f 50%, rgba(255, 107, 157, 0.2) 100%), #0a0a0f',
                 fontFamily: 'sans-serif'
@@ -260,6 +261,7 @@ export default function Home() {
               </div>
               
               <div className="flex justify-between items-center text-[#a09cc0] text-[14px] border-t border-white/10 pt-5 mt-2">
+                 {/* ⚠️ ЗАМЕНИ НИЖЕ ССЫЛКУ И ЮЗЕРНЕЙМ НА СВОЕГО БОТА */}
                  <div>Проверь свою пару в Telegram: <b>@my_psycho_bot</b></div>
                  <QrCode className="w-8 h-8 opacity-50" />
               </div>
