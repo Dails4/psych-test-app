@@ -13,7 +13,6 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    // 1. ПОДТВЕРЖДЕНИЕ ПЛАТЕЖА (Telegram требует дать добро перед списыванием звезд)
     if (body.pre_checkout_query) {
       await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerPreCheckoutQuery`, {
         method: 'POST',
@@ -26,25 +25,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    // 2. УСПЕШНАЯ ОПЛАТА
     if (body.message && body.message.successful_payment) {
       const userId = body.message.from.id;
       
-      // Записываем в базу "Премиум-билетик" на 1 час
-      await redis.set(`premium:${userId}`, 'true', { ex: 3600 });
+      // ✅ Даем премиум-доступ на 30 дней (2592000 секунд)
+      await redis.set(`premium:${userId}`, 'true', { ex: 2592000 });
       
       await sendTelegramMessage(userId, 
-        `⭐️ <b>Оплата прошла успешно!</b>\n\nЯ готов проанализировать всю вашу историю. Открой приложение и нажми кнопку запуска!`, 
+        `⭐️ <b>Premium-доступ активирован на 30 дней!</b>\n\nТеперь ИИ-Психолог анализирует до 100 000 символов, читает скрытые мотивы партнера и выдает детальную совместимость.\n\nЗапускай разбор!`, 
         {
           reply_markup: {
-            inline_keyboard: [[ { text: "🚀 Запустить премиум-разбор", web_app: { url: APP_URL } } ]]
+            inline_keyboard: [[ { text: "🚀 Открыть приложение", web_app: { url: APP_URL } } ]]
           }
         }
       );
       return NextResponse.json({ ok: true });
     }
 
-    // 3. ОБРАБОТКА ТЕКСТОВЫХ СООБЩЕНИЙ (Склейка переписки)
     if (body.message && body.message.text) {
       const chatId = body.message.chat.id;
       const text = body.message.text;

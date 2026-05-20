@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Brain, Shield, Zap, Activity, RefreshCcw, Share, HeartCrack, TrendingUp, 
-  Lightbulb, MessageSquareQuote, Fingerprint, QrCode 
+  Lightbulb, MessageSquareQuote, Fingerprint, QrCode, Lock, EyeOff 
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 
@@ -13,7 +13,7 @@ const WebApp = typeof window !== 'undefined' ? require('@twa-dev/sdk').default :
 const LOADING_MESSAGES = [
   "Прогреваем ИИ-психолога...",
   "Читаем пересланные сообщения...",
-  "Ищем скрытую пассивную агрессию...",
+  "Ищем скрытые мотивы партнера...",
   "Формируем психологический профиль..."
 ];
 
@@ -28,7 +28,14 @@ interface AnalysisResult {
   advice: string;
   dynamics: string;
   patterns: string[];
+  hiddenMotives?: string[];
+  detailedCompatibility?: {
+    emotional: number;
+    conflict: number;
+    dominance: number;
+  };
   suggestedReplies: { style: string; text: string }[];
+  isPremium: boolean;
 }
 
 export default function Home() {
@@ -70,36 +77,6 @@ export default function Home() {
   };
 
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-const handleBuyPremium = async () => {
-    if (!tgUserId) return;
-    haptic('heavy');
-    
-    try {
-      // 1. Просим бэкенд создать чек
-      const res = await fetch('/api/invoice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: tgUserId })
-      });
-      const data = await res.json();
-      
-      if (data.url && typeof window !== 'undefined' && WebApp) {
-        // 2. Открываем нативное окно оплаты Telegram
-        WebApp.openInvoice(data.url, (status: string) => {
-          if (status === 'paid') {
-            // Если юзер оплатил - сразу запускаем глубокий разбор
-            handleAnalyze();
-          } else {
-            haptic('light'); // Юзер закрыл окно или отменил оплату
-          }
-        });
-      }
-    } catch (e) {
-      console.error("Payment error:", e);
-      alert('Ошибка при создании платежа');
-    }
-  };
 
   const handleShare = async () => {
     if (!tgUserId) return;
@@ -151,6 +128,33 @@ const handleBuyPremium = async () => {
       } else {
         window.open(shareLink, '_blank');
       }
+    }
+  };
+
+  const handleBuyPremium = async () => {
+    if (!tgUserId) return;
+    haptic('heavy');
+    
+    try {
+      const res = await fetch('/api/invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: tgUserId })
+      });
+      const data = await res.json();
+      
+      if (data.url && typeof window !== 'undefined' && WebApp) {
+        WebApp.openInvoice(data.url, (status: string) => {
+          if (status === 'paid') {
+            handleAnalyze();
+          } else {
+            haptic('light'); 
+          }
+        });
+      }
+    } catch (e) {
+      console.error("Payment error:", e);
+      alert('Ошибка при создании платежа');
     }
   };
 
@@ -245,16 +249,9 @@ const handleBuyPremium = async () => {
               <div className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-[12px] text-[#a09cc0] flex items-center gap-1.5"><Shield className="w-3.5 h-3.5 text-[#06d6a0]" /> Анонимно</div>
             </div>
             
-            <div className="w-full space-y-3">
-  <button onClick={handleAnalyze} className="w-full py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-bold text-[16px] transition-transform active:scale-95">
-    Базовый разбор (бесплатно)
-  </button>
-  
-  <button onClick={handleBuyPremium} className="w-full py-4 bg-gradient-to-r from-[#7c5cfc] to-[#ff6b9d] rounded-2xl text-white font-bold text-[16px] shadow-[0_8px_32px_rgba(124,92,252,0.4)] transition-transform active:scale-95 flex items-center justify-center gap-2">
-    <span>Глубокий психоанализ</span>
-    <span className="bg-white/20 px-2 py-0.5 rounded-md text-[14px]">50 ⭐️</span>
-  </button>
-</div>
+            <button onClick={handleAnalyze} className="w-full py-4 bg-gradient-to-r from-[#7c5cfc] to-[#ff6b9d] rounded-2xl text-white font-bold text-lg shadow-[0_8px_32px_rgba(124,92,252,0.4)] transition-transform active:scale-95">
+              🔥 Сделать ИИ-разбор →
+            </button>
           </motion.div>
         )}
 
@@ -273,7 +270,7 @@ const handleBuyPremium = async () => {
         {screen === 'result' && resultData && (
           <motion.div key="result" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="z-10 flex flex-col w-full max-w-md h-full flex-1 pt-4 pb-36">
             
-            {/* СКРЫТАЯ КАРТОЧКА ДЛЯ ШЕРИНГА (ОБНОВЛЕННЫЙ ВИРАЛЬНЫЙ ДИЗАЙН) */}
+            {/* СКРЫТАЯ КАРТОЧКА ДЛЯ ШЕРИНГА */}
             <div className={`fixed top-0 left-0 overflow-hidden pointer-events-none ${isSharing ? 'z-[9998] opacity-100' : 'z-[-99] opacity-0'}`}>
               <div 
                 ref={shareCardRef} 
@@ -283,7 +280,6 @@ const handleBuyPremium = async () => {
                   fontFamily: 'sans-serif'
                 }}
               >
-                {/* Шапка */}
                 <div className="flex flex-col items-center text-center mb-6">
                   <div className="flex items-center gap-2 mb-2">
                     <Brain className="w-5 h-5 text-[#c77dff]" />
@@ -297,7 +293,6 @@ const handleBuyPremium = async () => {
                   </div>
                 </div>
 
-                {/* Статистика */}
                 <div className="grid grid-cols-2 gap-4 flex-1">
                   <div className="bg-white/5 border border-white/10 rounded-3xl p-5 flex flex-col justify-center items-center text-center">
                     <h3 className="text-[13px] text-[#a09cc0] uppercase tracking-wider mb-2 font-bold">Токсичность</h3>
@@ -320,7 +315,6 @@ const handleBuyPremium = async () => {
                   </div>
                 </div>
                 
-                {/* ВИРАЛЬНЫЙ БЛОК (Hook + CTA) */}
                 <div className="mt-5 bg-[#7c5cfc]/20 border border-[#7c5cfc]/40 rounded-3xl p-5 flex items-center justify-between shadow-[0_0_30px_rgba(124,92,252,0.15)]">
                   <div>
                     <div className="text-white font-black text-[18px] mb-1">А кто ты в отношениях? 👀</div>
@@ -330,14 +324,13 @@ const handleBuyPremium = async () => {
                     <div className="bg-white p-1.5 rounded-xl mb-1.5 shadow-lg">
                       <QrCode className="w-8 h-8 text-black" />
                     </div>
-                    {/* ⚠️ ЗАМЕНИ ЮЗЕРНЕЙМ НА СВОЕГО БОТА */}
                     <div className="font-black text-[#c77dff] text-[14px] tracking-wide">@my_psycho_bot</div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* ОСНОВНОЙ КОНТЕНТ (То, что юзер видит до нажатия кнопки) */}
+            {/* ОСНОВНОЙ КОНТЕНТ */}
             <div className="text-center mb-8">
               <h2 className="text-3xl font-extrabold bg-gradient-to-br from-white to-[#c77dff] bg-clip-text text-transparent leading-tight">{resultData.mainVibe}</h2>
               <div className="text-[#a09cc0] mt-2 text-sm">{resultData.attachmentStyle} тип привязанности</div>
@@ -361,6 +354,63 @@ const handleBuyPremium = async () => {
                   <div className="text-sm text-[#a09cc0]">%</div>
                 </div>
               </div>
+            </div>
+
+            {/* НОВЫЙ ПРЕМИУМ БЛОК: Скрытые мотивы (Чтение мыслей) */}
+            <div className="relative mb-4">
+              <div className={`bg-[#ff4757]/10 border border-[#ff4757]/30 rounded-3xl p-6 transition-all ${!resultData.isPremium ? 'filter blur-[6px] opacity-60 pointer-events-none select-none' : ''}`}>
+                <div className="text-xs text-[#ff4757] uppercase tracking-wider mb-4 font-bold flex items-center gap-2"><EyeOff className="w-4 h-4"/> Скрытые мотивы партнера</div>
+                <div className="space-y-4">
+                  {(resultData.hiddenMotives || ["Якобы ничего не случилось - На самом деле это манипуляция чувством вины"]).map((motive, idx) => {
+                    const parts = motive.split(' - ');
+                    return (
+                      <div key={idx} className="border-b border-[#ff4757]/20 pb-4 last:border-0 last:pb-0">
+                        <div className="text-[14px] italic text-[#a09cc0] mb-1">«{parts[0]}»</div>
+                        <div className="text-[15px] font-bold text-white">🧠 {parts[1] || 'Скрытый смысл'}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              
+              {/* Overlay для бесплатных пользователей */}
+              {!resultData.isPremium && (
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#0a0a0f]/40 backdrop-blur-sm rounded-3xl border border-white/10">
+                  <Lock className="w-8 h-8 text-[#ff6b9d] mb-2" />
+                  <div className="text-white font-bold text-center px-4">Скрытые мотивы партнера</div>
+                  <div className="text-[#a09cc0] text-sm mt-1 text-center px-4">Доступно в Premium-разборе</div>
+                </div>
+              )}
+            </div>
+
+            {/* НОВЫЙ ПРЕМИУМ БЛОК: Детальная совместимость */}
+            <div className="relative mb-4">
+              <div className={`bg-white/5 border border-white/10 rounded-3xl p-6 transition-all ${!resultData.isPremium ? 'filter blur-[5px] opacity-60 pointer-events-none select-none' : ''}`}>
+                <div className="text-xs text-[#a09cc0] uppercase tracking-wider mb-5 font-bold">Детальная совместимость</div>
+                
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex justify-between text-[13px] mb-1.5"><span className="text-[#a09cc0]">Эмоциональная близость</span><span className="font-bold text-white">{resultData.detailedCompatibility?.emotional || 85}%</span></div>
+                    <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden"><div className="bg-[#c77dff] h-full rounded-full" style={{width: `${resultData.detailedCompatibility?.emotional || 85}%`}}></div></div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-[13px] mb-1.5"><span className="text-[#a09cc0]">Поведение в конфликтах</span><span className="font-bold text-white">{resultData.detailedCompatibility?.conflict || 40}%</span></div>
+                    <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden"><div className="bg-[#ff4757] h-full rounded-full" style={{width: `${resultData.detailedCompatibility?.conflict || 40}%`}}></div></div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-[13px] mb-1.5"><span className="text-[#a09cc0]">Баланс доминантности</span><span className="font-bold text-white">{resultData.detailedCompatibility?.dominance || 60}%</span></div>
+                    <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden"><div className="bg-[#06d6a0] h-full rounded-full" style={{width: `${resultData.detailedCompatibility?.dominance || 60}%`}}></div></div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Overlay для бесплатных пользователей */}
+              {!resultData.isPremium && (
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#0a0a0f]/40 backdrop-blur-[2px] rounded-3xl border border-white/10">
+                  <Lock className="w-8 h-8 text-[#c77dff] mb-2" />
+                  <div className="text-white font-bold">Подробная статистика</div>
+                </div>
+              )}
             </div>
 
             {resultData.patterns && resultData.patterns.length > 0 && (
@@ -429,7 +479,7 @@ const handleBuyPremium = async () => {
               </div>
             )}
 
-            <div className="space-y-4 mb-4">
+            <div className="space-y-4 mb-8 pb-32">
               {resultData.forecast && (
                 <div className="bg-[#7c5cfc]/10 border border-[#7c5cfc]/30 rounded-3xl p-6">
                   <div className="text-xs text-[#c77dff] uppercase tracking-wider mb-3 font-bold flex items-center gap-2"><TrendingUp className="w-4 h-4"/> Прогноз на полгода</div>
@@ -444,16 +494,29 @@ const handleBuyPremium = async () => {
               )}
             </div>
 
-            <div className="fixed bottom-0 left-0 right-0 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] bg-[#0a0a0f]/95 backdrop-blur-xl flex gap-3 justify-center border-t border-white/5 z-50">
-              <button onClick={startOver} className="flex-1 py-4 bg-white/5 border border-white/10 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform text-white">
-                <RefreshCcw className="w-5 h-5" /> Начать заново
-              </button>
-              <button 
-                onClick={handleShare} 
-                className="flex-[2] py-4 bg-gradient-to-r from-[#7c5cfc] to-[#ff6b9d] rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform text-white"
-              >
-                <Share className="w-5 h-5" /> Поделиться результатом
-              </button>
+            {/* Фиксированная панель кнопок: логика отображения для Premium и Free */}
+            <div className="fixed bottom-0 left-0 right-0 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] bg-[#0a0a0f]/95 backdrop-blur-xl flex flex-col gap-3 justify-center border-t border-white/5 z-50">
+              
+              {!resultData.isPremium && (
+                <button 
+                  onClick={handleBuyPremium} 
+                  className="w-full py-4 bg-gradient-to-r from-[#7c5cfc] to-[#ff6b9d] rounded-2xl font-bold flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,107,157,0.3)] active:scale-95 transition-transform text-white"
+                >
+                  <Lock className="w-5 h-5" /> Разблокировать Premium (50 ⭐️)
+                </button>
+              )}
+
+              <div className="flex gap-3 w-full">
+                <button onClick={startOver} className="flex-1 py-4 bg-white/5 border border-white/10 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform text-white">
+                  <RefreshCcw className="w-5 h-5" /> Новый
+                </button>
+                <button 
+                  onClick={handleShare} 
+                  className={`flex-[2] py-4 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform text-white ${resultData.isPremium ? 'bg-gradient-to-r from-[#7c5cfc] to-[#ff6b9d]' : 'bg-white/10 border border-white/20'}`}
+                >
+                  <Share className="w-5 h-5" /> В Сторис
+                </button>
+              </div>
             </div>
             
           </motion.div>
