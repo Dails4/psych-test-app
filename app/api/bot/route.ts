@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Redis } from '@upstash/redis';
 
-// Подключаем Upstash (он сам найдет ключи Vercel)
+// Подключаем Upstash (он сам найдет ключи Vercel KV)
 const redis = new Redis({
   url: process.env.KV_REST_API_URL || '',
   token: process.env.KV_REST_API_TOKEN || '',
@@ -35,17 +35,23 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true });
       }
 
-      // 1. Атомарное склеивание текста. 
-      // redis.append просто дописывает кусок в конец строки, это работает мгновенно и без потерь.
-      const author = body.message.forward_from ? (body.message.forward_from.first_name || 'Партнер') : 'Сообщение';
+      // Умное определение автора сообщения
+      let author = 'Партнер';
+      if (body.message.forward_from?.id === userId) {
+        author = 'Я'; // Пользователь переслал свое собственное сообщение
+      } else if (body.message.forward_sender_name || body.message.forward_from) {
+        author = 'Партнер'; // Сообщение от другого человека
+      } else if (!body.message.forward_date) {
+        author = 'Я'; // Если юзер просто написал текст от себя (не пересылая)
+      }
+
       const cleanText = `[${author}]: ${text}\n`;
       
+      // Атомарное склеивание текста
       await redis.append(`chat:${userId}`, cleanText);
       await redis.expire(`chat:${userId}`, 86400); // Обновляем срок жизни базы на 24 часа
 
-      // 2. Блокировка от спама (Lock)
-      // nx: true означает "записать, только если ключа нет". ex: 3 означает "удалить через 3 секунды".
-      // При одновременном прилете 50 сообщений, только ПЕРВОЕ получит lock = "OK", остальные получат null.
+      // Блокировка от спама (Lock). nx: true - записать, только если ключа нет. ex: 3 - удалить через 3 секунды.
       const lock = await redis.set(`lock:${userId}`, 'locked', { nx: true, ex: 3 });
 
       if (lock) {

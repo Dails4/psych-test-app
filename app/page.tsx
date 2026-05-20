@@ -67,9 +67,9 @@ export default function Home() {
 
   const handleShare = () => {
     haptic('light');
-    if (typeof window !== 'undefined' && WebApp?.initData && resultData) {
-      // ⚠️ ВАЖНО: Замени ссылку ниже на реальный юзернейм твоего бота (например: https://t.me/my_cool_psycho_bot)
-      const botUrl = "https://t.me/ТВОЙ_БОТ"; 
+    if (resultData) {
+      // ⚠️ ВАЖНО: Замени "my_psycho_bot" на реальный юзернейм твоего бота
+      const botUrl = "https://t.me/my_psycho_bot"; 
       
       const text = `🔥 Мой результат у ИИ-Психолога:\n\n` +
                    `Уровень токсичности: ${resultData.toxicityScore}/100\n` +
@@ -77,7 +77,35 @@ export default function Home() {
                    `Проверь свою переписку 👇`;
                    
       const shareLink = `https://t.me/share/url?url=${encodeURIComponent(botUrl)}&text=${encodeURIComponent(text)}`;
-      WebApp.openTelegramLink(shareLink);
+      
+      if (typeof window !== 'undefined') {
+        if (WebApp?.initData && WebApp.platform !== 'unknown') {
+          try {
+            WebApp.openTelegramLink(shareLink);
+          } catch (e) {
+            window.open(shareLink, '_blank');
+          }
+        } else {
+          window.open(shareLink, '_blank');
+        }
+      }
+    }
+  };
+
+  const handleSendReplyToChat = (replyText: string) => {
+    haptic('medium');
+    const shareLink = `https://t.me/share/url?url=&text=${encodeURIComponent(replyText)}`;
+    
+    if (typeof window !== 'undefined') {
+      if (WebApp?.initData && WebApp.platform !== 'unknown') {
+        try {
+          WebApp.openTelegramLink(shareLink);
+        } catch (e) {
+          window.open(shareLink, '_blank');
+        }
+      } else {
+        window.open(shareLink, '_blank');
+      }
     }
   };
 
@@ -217,6 +245,7 @@ export default function Home() {
               </div>
             )}
 
+            {/* БЛОК С КРАСНЫМИ ФЛАГАМИ (не показываем, если флагов нет) */}
             {resultData.redFlags && resultData.redFlags.length > 0 && !resultData.redFlags.includes("Красных флагов нет") && (
               <div className="bg-white/5 border border-[#ff4757]/20 rounded-3xl p-6 mb-4">
                 <div className="text-xs text-[#ff4757] uppercase tracking-wider mb-5 font-bold">Красные флаги 🚩</div>
@@ -236,14 +265,24 @@ export default function Home() {
               </div>
             )}
 
+            {/* ПЕРЕВОДЧИК С КНОПКАМИ ОТПРАВКИ */}
             {resultData.suggestedReplies && resultData.suggestedReplies.length > 0 && (
               <div className="bg-gradient-to-br from-[#7c5cfc]/10 to-[#ff6b9d]/5 border border-[#7c5cfc]/30 rounded-3xl p-6 mb-4">
                 <div className="text-xs text-[#c77dff] uppercase tracking-wider mb-5 font-bold flex items-center gap-2"><MessageSquareQuote className="w-4 h-4"/> Как ответить на последнее сообщение</div>
                 <div className="space-y-3">
                   {resultData.suggestedReplies.map((reply, idx) => (
-                    <div key={idx} className="bg-[#0a0a0f]/50 p-4 rounded-2xl border border-white/5">
+                    <div key={idx} className="bg-[#0a0a0f]/50 p-4 rounded-2xl border border-white/5 relative group">
                       <div className="text-[11px] font-bold text-[#c77dff] uppercase mb-2">{reply.style}</div>
-                      <div className="text-[15px] text-white/90 leading-relaxed">{reply.text}</div>
+                      <div className="text-[15px] text-white/90 leading-relaxed pr-10">{reply.text}</div>
+                      
+                      {/* Кнопка отправки прямо в чат */}
+                      <button 
+                        onClick={() => handleSendReplyToChat(reply.text)}
+                        className="absolute right-4 bottom-4 w-8 h-8 bg-white/10 hover:bg-[#7c5cfc] rounded-full flex items-center justify-center transition-colors active:scale-90"
+                        title="Отправить в чат"
+                      >
+                        <span className="text-sm">✈️</span>
+                      </button>
                     </div>
                   ))}
                 </div>
