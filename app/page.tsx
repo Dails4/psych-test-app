@@ -72,19 +72,22 @@ export default function Home() {
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
   const handleShare = async () => {
-    if (!shareCardRef.current || !tgUserId) return;
+    if (!tgUserId) return;
     
     haptic('medium');
-    setIsSharing(true);
+    setIsSharing(true); 
 
     try {
-      await delay(300); // Микро-задержка для отрисовки шрифтов и градиента
+      await delay(500);
 
-      // Генерируем картинку (теперь карточка полностью непрозрачная, но находится за экраном)
+      if (!shareCardRef.current) throw new Error("Нет рефа");
+
       const dataUrl = await toPng(shareCardRef.current, {
         cacheBust: true,
         pixelRatio: 2,
         backgroundColor: '#0a0a0f',
+        width: 500,
+        height: 500
       });
 
       await fetch('/api/share', {
@@ -95,12 +98,11 @@ export default function Home() {
 
       haptic('heavy');
       if (typeof window !== 'undefined' && WebApp?.initData) {
-        setTimeout(() => WebApp.close(), 1500); 
+        setTimeout(() => WebApp.close(), 1000); 
       }
     } catch (err) {
       console.error("handleShare Error:", err);
       alert('Не удалось сгенерировать картинку :(');
-    } finally {
       setIsSharing(false);
     }
   };
@@ -172,6 +174,24 @@ export default function Home() {
       <div className="fixed top-[-100px] right-[-80px] w-[300px] h-[300px] bg-[#7c5cfc]/20 rounded-full blur-[80px] pointer-events-none animate-pulse" />
       <div className="fixed bottom-[20%] left-[-100px] w-[250px] h-[250px] bg-[#ff6b9d]/20 rounded-full blur-[80px] pointer-events-none animate-pulse" style={{ animationDelay: '2s' }} />
 
+      <AnimatePresence>
+        {isSharing && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            className="fixed inset-0 z-[9999] bg-[#0a0a0f] flex flex-col items-center justify-center"
+          >
+            <div className="relative w-32 h-32 mb-8 flex items-center justify-center">
+              <div className="absolute inset-0 border-4 border-[#7c5cfc]/30 rounded-full animate-[spin_3s_linear_infinite]" />
+              <div className="absolute inset-0 border-4 border-transparent border-t-[#ff6b9d] rounded-full animate-[spin_1.5s_ease-in-out_infinite]" />
+              <Share className="w-10 h-10 text-[#c77dff] animate-pulse" />
+            </div>
+            <h2 className="text-2xl font-bold mb-2">Отправляем фото...</h2>
+            <p className="text-[#a09cc0]">Секундочку, рисуем результат</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence mode="wait">
         
         {screen === 'welcome' && (
@@ -216,58 +236,71 @@ export default function Home() {
         {screen === 'result' && resultData && (
           <motion.div key="result" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="z-10 flex flex-col w-full max-w-md h-full flex-1 pt-4 pb-36">
             
-            {/* СКРЫТАЯ КАРТОЧКА ДЛЯ ШЕРИНГА (убрали opacity-0, вынесли далеко влево за экран) */}
-            <div 
-              ref={shareCardRef} 
-              className="fixed top-0 left-[9999px] w-[500px] h-[500px] p-8 flex flex-col justify-between text-white pointer-events-none"
-              style={{
-                background: 'linear-gradient(135deg, rgba(124, 92, 252, 0.3) 0%, #0a0a0f 50%, rgba(255, 107, 157, 0.2) 100%), #0a0a0f',
-                fontFamily: 'sans-serif'
-              }}
-            >
-              <div className="flex justify-between items-start">
-                <div>
-                  <div className="text-[14px] text-[#a09cc0] uppercase tracking-wider mb-1">ИИ Психоанализ: Диагноз</div>
-                  <h2 className="text-[36px] font-extrabold leading-tight tracking-tight bg-gradient-to-br from-white via-white to-[#c77dff] bg-clip-text text-transparent">
+            {/* СКРЫТАЯ КАРТОЧКА ДЛЯ ШЕРИНГА (ОБНОВЛЕННЫЙ ВИРАЛЬНЫЙ ДИЗАЙН) */}
+            <div className={`fixed top-0 left-0 overflow-hidden pointer-events-none ${isSharing ? 'z-[9998] opacity-100' : 'z-[-99] opacity-0'}`}>
+              <div 
+                ref={shareCardRef} 
+                className="w-[500px] h-[500px] p-8 flex flex-col text-white"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(124, 92, 252, 0.4) 0%, #0a0a0f 40%, rgba(255, 107, 157, 0.3) 100%), #0a0a0f',
+                  fontFamily: 'sans-serif'
+                }}
+              >
+                {/* Шапка */}
+                <div className="flex flex-col items-center text-center mb-6">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Brain className="w-5 h-5 text-[#c77dff]" />
+                    <span className="font-bold text-[#a09cc0] tracking-wider uppercase text-[12px]">Разбор переписки от ИИ</span>
+                  </div>
+                  <h2 className="text-[34px] font-extrabold leading-tight tracking-tight bg-gradient-to-br from-white via-white to-[#c77dff] bg-clip-text text-transparent">
                     {resultData.mainVibe}
                   </h2>
-                  <div className="text-[18px] text-[#a09cc0] mt-1">{resultData.attachmentStyle} тип привязанности</div>
-                </div>
-                <div className="w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center p-3">
-                   <Brain className="w-full h-full text-[#c77dff]" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-6 my-6 flex-1 items-center">
-                <div className="bg-white/5 border border-white/10 rounded-3xl p-6 flex flex-col justify-center h-full">
-                  <h3 className="text-[14px] text-[#a09cc0] uppercase tracking-wider mb-2 font-bold">Токсичность</h3>
-                  <div className="flex items-baseline gap-1">
-                    <div className={`text-[64px] font-black leading-none ${resultData.toxicityScore > 50 ? 'text-[#ff4757]' : 'text-[#06d6a0]'}`}>
-                      {resultData.toxicityScore}
-                    </div>
-                    <div className="text-[20px] text-[#a09cc0]">/100</div>
+                  <div className="text-[16px] text-white mt-2 bg-white/10 px-4 py-1.5 rounded-full border border-white/10 inline-block">
+                    {resultData.attachmentStyle} тип привязанности
                   </div>
                 </div>
 
-                <div className="bg-white/5 border border-white/10 rounded-3xl p-6 flex flex-col justify-center h-full">
-                  <h3 className="text-[14px] text-[#a09cc0] uppercase tracking-wider mb-2 font-bold">Совместимость</h3>
-                  <div className="flex items-baseline gap-1">
-                    <div className={`text-[64px] font-black leading-none ${resultData.compatibilityScore < 50 ? 'text-[#ff4757]' : 'text-[#06d6a0]'}`}>
-                      {resultData.compatibilityScore}
+                {/* Статистика */}
+                <div className="grid grid-cols-2 gap-4 flex-1">
+                  <div className="bg-white/5 border border-white/10 rounded-3xl p-5 flex flex-col justify-center items-center text-center">
+                    <h3 className="text-[13px] text-[#a09cc0] uppercase tracking-wider mb-2 font-bold">Токсичность</h3>
+                    <div className="flex items-baseline gap-1">
+                      <div className={`text-[56px] font-black leading-none ${resultData.toxicityScore > 50 ? 'text-[#ff4757]' : 'text-[#06d6a0]'}`}>
+                        {resultData.toxicityScore}
+                      </div>
+                      <div className="text-[18px] text-[#a09cc0]">/100</div>
                     </div>
-                    <div className="text-[20px] text-[#a09cc0]">%</div>
+                  </div>
+
+                  <div className="bg-white/5 border border-white/10 rounded-3xl p-5 flex flex-col justify-center items-center text-center">
+                    <h3 className="text-[13px] text-[#a09cc0] uppercase tracking-wider mb-2 font-bold">Совместимость</h3>
+                    <div className="flex items-baseline gap-1">
+                      <div className={`text-[56px] font-black leading-none ${resultData.compatibilityScore < 50 ? 'text-[#ff4757]' : 'text-[#06d6a0]'}`}>
+                        {resultData.compatibilityScore}
+                      </div>
+                      <div className="text-[18px] text-[#a09cc0]">/100</div>
+                    </div>
                   </div>
                 </div>
-              </div>
-              
-              <div className="flex justify-between items-center text-[#a09cc0] text-[14px] border-t border-white/10 pt-5 mt-2">
-                 {/* ⚠️ ЗАМЕНИ НИЖЕ ССЫЛКУ И ЮЗЕРНЕЙМ НА СВОЕГО БОТА */}
-                 <div>Проверь свою пару в Telegram: <b>@my_psycho_bot</b></div>
-                 <QrCode className="w-8 h-8 opacity-50" />
+                
+                {/* ВИРАЛЬНЫЙ БЛОК (Hook + CTA) */}
+                <div className="mt-5 bg-[#7c5cfc]/20 border border-[#7c5cfc]/40 rounded-3xl p-5 flex items-center justify-between shadow-[0_0_30px_rgba(124,92,252,0.15)]">
+                  <div>
+                    <div className="text-white font-black text-[18px] mb-1">А кто ты в отношениях? 👀</div>
+                    <div className="text-[#a09cc0] text-[14px] leading-relaxed">Проверь свою переписку на<br/>токсичность и скрытые манипуляции.</div>
+                  </div>
+                  <div className="text-right flex flex-col items-center justify-center">
+                    <div className="bg-white p-1.5 rounded-xl mb-1.5 shadow-lg">
+                      <QrCode className="w-8 h-8 text-black" />
+                    </div>
+                    {/* ⚠️ ЗАМЕНИ ЮЗЕРНЕЙМ НА СВОЕГО БОТА */}
+                    <div className="font-black text-[#c77dff] text-[14px] tracking-wide">@my_psycho_bot</div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* ОСНОВНОЙ КОНТЕНТ */}
+            {/* ОСНОВНОЙ КОНТЕНТ (То, что юзер видит до нажатия кнопки) */}
             <div className="text-center mb-8">
               <h2 className="text-3xl font-extrabold bg-gradient-to-br from-white to-[#c77dff] bg-clip-text text-transparent leading-tight">{resultData.mainVibe}</h2>
               <div className="text-[#a09cc0] mt-2 text-sm">{resultData.attachmentStyle} тип привязанности</div>
@@ -380,11 +413,9 @@ export default function Home() {
               </button>
               <button 
                 onClick={handleShare} 
-                disabled={isSharing}
-                className="flex-[2] py-4 bg-gradient-to-r from-[#7c5cfc] to-[#ff6b9d] rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform text-white disabled:opacity-50"
+                className="flex-[2] py-4 bg-gradient-to-r from-[#7c5cfc] to-[#ff6b9d] rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform text-white"
               >
-                <Share className="w-5 h-5" /> 
-                {isSharing ? 'Генерируем фото...' : 'Поделиться результатом'}
+                <Share className="w-5 h-5" /> Поделиться результатом
               </button>
             </div>
             
