@@ -70,6 +70,9 @@ export default function Home() {
     }
   };
 
+  // Хелпер для создания искусственной задержки
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
   const handleShare = async () => {
     if (!shareCardRef.current || !tgUserId) return;
     
@@ -77,11 +80,18 @@ export default function Home() {
     setIsSharing(true);
 
     try {
+      // ✅ ФИКС: Искусственная задержка 100мс.
+      // Даем браузеру время "нарисовать" скрытую карточку, градиенты и шрифты.
+      await delay(100);
+
+      // Генерируем картинку из СКРЫТОЙ карточки
       const dataUrl = await toPng(shareCardRef.current, {
         cacheBust: true,
-        pixelRatio: 2
+        pixelRatio: 2, // Хорошее качество
+        backgroundColor: '#0a0a0f', // ✅ ФИКС: Жесткий Fallback фона, если градиент не успел.
       });
 
+      // Отправляем картинку на наш API бэкенд
       await fetch('/api/share', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -90,10 +100,11 @@ export default function Home() {
 
       haptic('heavy');
       if (typeof window !== 'undefined' && WebApp?.initData) {
+        // Мы НЕ закрываем приложение сразу, чтобы юзер увидел, что фото улетело
         setTimeout(() => WebApp.close(), 1500); 
       }
     } catch (err) {
-      console.error(err);
+      console.error("handleShare Error:", err);
       alert('Не удалось сгенерировать картинку :(');
     } finally {
       setIsSharing(false);
@@ -164,6 +175,7 @@ export default function Home() {
   return (
     <main className="min-h-[100dvh] relative overflow-x-hidden flex flex-col items-center p-6 bg-[#0a0a0f] text-[#f0eeff]">
       
+      {/* Анимированные фоновые градиенты (видны пользователю) */}
       <div className="fixed top-[-100px] right-[-80px] w-[300px] h-[300px] bg-[#7c5cfc]/20 rounded-full blur-[80px] pointer-events-none animate-pulse" />
       <div className="fixed bottom-[20%] left-[-100px] w-[250px] h-[250px] bg-[#ff6b9d]/20 rounded-full blur-[80px] pointer-events-none animate-pulse" style={{ animationDelay: '2s' }} />
 
@@ -211,13 +223,18 @@ export default function Home() {
         {screen === 'result' && resultData && (
           <motion.div key="result" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="z-10 flex flex-col w-full max-w-md h-full flex-1 pt-4 pb-36">
             
-            {/* СКРЫТАЯ КАРТОЧКА ДЛЯ ШЕРИНГА */}
+            {/* ========================================================================
+              СКРЫТАЯ КАРТОЧКА ДЛЯ ШЕРИНГА (то, что видит html-to-image)
+              Мы делаем её квадратной, крупной, с сочным статическим градиентом.
+              ========================================================================
+            */}
             <div 
               ref={shareCardRef} 
               className="absolute -top-[5000px] left-0 w-[500px] h-[500px] p-8 flex flex-col justify-between text-white"
               style={{
+                // Этот статический градиент ИИ ПСИХОЛОГ должен "сфотографировать"
                 background: 'radial-gradient(circle at 10% 10%, rgba(124, 92, 252, 0.4) 0%, rgba(10, 10, 15, 1) 50%, rgba(255, 107, 157, 0.3) 100%), #0a0a0f',
-                fontFamily: 'sans-serif'
+                fontFamily: 'sans-serif' // Убедимся, что шрифт загрузится для картинки
               }}
             >
               <div className="flex justify-between items-start">
@@ -256,12 +273,15 @@ export default function Home() {
               </div>
               
               <div className="flex justify-between items-center text-[#a09cc0] text-[14px] border-t border-white/10 pt-5 mt-2">
-                 <div>Проверь свою пару в Telegram: <b>@ТВОЙ_БОТ</b></div>
+                 {/* ⚠️ ЗАМЕНИ НИЖЕ ССЫЛКУ И ЮЗЕРНЕЙМ НА СВОЕГО БОТА */}
+                 <div>Проверь свою пару в Telegram: <b>@my_psycho_bot</b></div>
                  <QrCode className="w-8 h-8 opacity-50" />
               </div>
             </div>
+            {/* ======================================================================== */}
 
-            {/* ОСНОВНОЙ КОНТЕНТ */}
+
+            {/* Основной контент страницы результатов (то, что видит пользователь) */}
             <div className="text-center mb-8">
               <h2 className="text-3xl font-extrabold bg-gradient-to-br from-white to-[#c77dff] bg-clip-text text-transparent leading-tight">{resultData.mainVibe}</h2>
               <div className="text-[#a09cc0] mt-2 text-sm">{resultData.attachmentStyle} тип привязанности</div>
@@ -305,6 +325,7 @@ export default function Home() {
               </div>
             )}
 
+            {/* БЛОК С КРАСНЫМИ ФЛАГАМИ (скрыт, если их нет) */}
             {resultData.redFlags && resultData.redFlags.length > 0 && !resultData.redFlags.includes("Красных флагов нет") && (
               <div className="bg-white/5 border border-[#ff4757]/20 rounded-3xl p-6 mb-4">
                 <div className="text-xs text-[#ff4757] uppercase tracking-wider mb-5 font-bold">Красные флаги 🚩</div>
@@ -368,6 +389,7 @@ export default function Home() {
               )}
             </div>
 
+            {/* Фиксированная панель кнопок (видна пользователю, НЕ попадает на скриншот) */}
             <div className="fixed bottom-0 left-0 right-0 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] bg-[#0a0a0f]/95 backdrop-blur-xl flex gap-3 justify-center border-t border-white/5 z-50">
               <button onClick={startOver} className="flex-1 py-4 bg-white/5 border border-white/10 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform text-white">
                 <RefreshCcw className="w-5 h-5" /> Начать заново
