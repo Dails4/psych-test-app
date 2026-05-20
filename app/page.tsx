@@ -71,6 +71,36 @@ export default function Home() {
 
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+const handleBuyPremium = async () => {
+    if (!tgUserId) return;
+    haptic('heavy');
+    
+    try {
+      // 1. Просим бэкенд создать чек
+      const res = await fetch('/api/invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: tgUserId })
+      });
+      const data = await res.json();
+      
+      if (data.url && typeof window !== 'undefined' && WebApp) {
+        // 2. Открываем нативное окно оплаты Telegram
+        WebApp.openInvoice(data.url, (status: string) => {
+          if (status === 'paid') {
+            // Если юзер оплатил - сразу запускаем глубокий разбор
+            handleAnalyze();
+          } else {
+            haptic('light'); // Юзер закрыл окно или отменил оплату
+          }
+        });
+      }
+    } catch (e) {
+      console.error("Payment error:", e);
+      alert('Ошибка при создании платежа');
+    }
+  };
+
   const handleShare = async () => {
     if (!tgUserId) return;
     
@@ -215,9 +245,16 @@ export default function Home() {
               <div className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-[12px] text-[#a09cc0] flex items-center gap-1.5"><Shield className="w-3.5 h-3.5 text-[#06d6a0]" /> Анонимно</div>
             </div>
             
-            <button onClick={handleAnalyze} className="w-full py-4 bg-gradient-to-r from-[#7c5cfc] to-[#ff6b9d] rounded-2xl text-white font-bold text-lg shadow-[0_8px_32px_rgba(124,92,252,0.4)] transition-transform active:scale-95">
-              🔥 Сделать ИИ-разбор →
-            </button>
+            <div className="w-full space-y-3">
+  <button onClick={handleAnalyze} className="w-full py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-bold text-[16px] transition-transform active:scale-95">
+    Базовый разбор (бесплатно)
+  </button>
+  
+  <button onClick={handleBuyPremium} className="w-full py-4 bg-gradient-to-r from-[#7c5cfc] to-[#ff6b9d] rounded-2xl text-white font-bold text-[16px] shadow-[0_8px_32px_rgba(124,92,252,0.4)] transition-transform active:scale-95 flex items-center justify-center gap-2">
+    <span>Глубокий психоанализ</span>
+    <span className="bg-white/20 px-2 py-0.5 rounded-md text-[14px]">50 ⭐️</span>
+  </button>
+</div>
           </motion.div>
         )}
 
